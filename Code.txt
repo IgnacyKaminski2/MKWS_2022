@@ -1,0 +1,170 @@
+import cantera as ct
+import matplotlib.pyplot as plot
+
+#initial conditions
+T = 300#K
+P = 101325#Pa
+V = 1#m3
+R = 8.31446261815314#J/mol*K
+T1 = 1200#K
+P1 = P * T1 / T 
+
+mechanika = 'gri30.cti'
+
+
+#this function calculates explosion parameters
+def Parameters (m, phi):
+    #Pw[0] - time
+    #Pw[1] - explosion pressure
+    #Pw[2] - explosion pressure rise rate
+    Pw = [[], [], []]
+    m.TD = T1, None
+    r = ct.IdealGasReactor(m)#this is a constant volume ideal gas reactor
+    sim = ct.ReactorNet([r])
+    time = 0.0
+    states = ct.SolutionArray(m, extra=['t'])
+    dP = [P1]
+    sim.advance(time)
+    states.append(r.thermo.state, t=time)
+    dP[0]=0
+    Pw[0].append(time)
+    Pw[1].append(states.P[0])
+    Pw[2].append(dP[0])
+    for n in range(1,1200):
+        time +=0.0001
+        sim.advance(time)
+        states.append(r.thermo.state, t=time)
+        dP.append((states.P[n]-states.P[n-1])*1/time)
+        Pw[0].append(time)
+        Pw[1].append(states.P[n])
+        Pw[2].append(dP[n])
+        #print('%5d %10.3f %10.3f %10.3f' % (n,time, states.P[n], dP[n]))
+        '''
+    plot.figure()
+    plot.plot(states.t, states.P)
+    plot.xlabel('time')
+    plot.ylabel('Explosion pressure')
+    plot.title('Explosion pressure')
+'''
+    return Pw
+    
+'''
+    setting stoichiometry
+    [type, n moles fuel, n moles oxygen, n moles nitrogen]
+'''
+    
+st = [['Methane', 1, 2, 2 * 3.76], ['Ethane', 1, 3.5, 13.16], ['Propane', 1, 5, 18.8]]
+print(st[0], st[1], st[2])
+
+
+'''
+    In this section of the project the calculations are made
+'''
+
+
+
+gas0 = ct.Solution(mechanika)
+Pe0 = [[[],[],[]],[[],[],[]],[[],[],[]]]
+
+n=(P*V)/(R*T)
+for i in range(0, 3, 1):
+    phi = 0.05
+    while(phi <= 20):
+        x = n/(st[i][1]*phi+st[i][2]+st[i][3]) #this is done so that the volume of the chamber is 1 m^3
+        if i == 0:
+            print(st[0][0])
+            gas0.X = {'CH4':st[i][1]*phi*x, 'O2':st[i][2]*x, 'N2':st[i][3]*x}
+        if i == 1:
+            print(st[1][0])
+            gas0.X = {'C2H6':st[i][1]*phi*x, 'O2':st[i][2]*x, 'N2':st[i][3]*x}
+        if i == 2:
+            print(st[2][0])
+            gas0.X = {'C3H8':st[i][1]*phi*x, 'O2':st[i][2]*x, 'N2':st[i][3]*x}
+        gas0.TP = T, P
+        Pe = Parameters(gas0, phi)
+        Pe0[i][0].append(phi)
+        Pe0[i][1].append(max(Pe[1]))
+        Pe0[i][2].append(max(Pe[2]))
+        print(phi)
+        phi = phi+0.05
+    
+    plot.figure()
+    plot.plot(Pe0[i][0], Pe0[i][1])
+    plot.xlabel('Equivalence ratio')
+    plot.ylabel('Explosion pressure [Pa]')
+    plot.title(st[i][0])
+    plot.figure()
+    plot.plot(Pe0[i][0], Pe0[i][2])
+    plot.xlabel('Equivalence ratio')
+    plot.ylabel('Explosion pressure rise rate [Pa/s]')
+    plot.title(st[i][0])
+
+'''
+    After this step explosion pressure and explosion pressure rise rate
+    functions are already calculated.
+    Now I will proceed to calculate explosion parameters
+'''
+
+
+Expl_press = [1,2,3]
+Expl_rate = [1,2,3]
+Expl_conc = [1,2,3]
+Expl_conc_pro = [1,2,3]
+Expl_lim_L = [1,2,3]
+Expl_lim_L_pro = [1,2,3]
+Expl_lim_H = [1,2,3]
+Expl_lim_H_pro = [1,2,3]
+
+gas = ct.Solution(mechanika)
+gas.X = {'CH4':st[i][1], 'O2':st[i][2], 'N2':st[i][3]}
+gas.TP = T, P
+p0 = gas.P
+gas.TD = T1, None
+p1 = gas.P
+Press = p1
+print('Pressure increase', Press)
+
+for i in range(0,3,1):
+    Expl_press[i] = max(Pe0[i][1])
+    Expl_rate[i] = max(Pe0[i][2])
+    l = len(Pe0[i][0])
+    k = 0
+    m = l - 1
+    for j in range(0,l,1):
+        if (Pe0[i][1][j]==max(Pe0[i][1])):
+            Expl_conc[i] = Pe0[i][0][j]
+    while k < l:
+        if (Pe0[i][1][k] >= (1.05 * Press)):
+            Expl_lim_L[i] = Pe0[i][0][k]
+            k = l
+            print(st[i][0]+' Expl_lim_L found')
+        k += 1
+    while m > 0:
+        if (Pe0[i][1][m] >= 1.05 * Press):
+            Expl_lim_H[i] = Pe0[i][0][m]
+            m = 0
+            print(st[i][0]+' Expl_lim_H found')
+        m -= 1
+
+Expl_conc_pro[0] = 100 * (st[0][1] * Expl_conc[0]) / (st[0][1] * Expl_conc[0] + st[0][2] + st[0][3])
+Expl_conc_pro[1] = 100 * (st[1][1] * Expl_conc[1]) / (st[1][1] * Expl_conc[1] + st[1][2] + st[1][3])
+Expl_conc_pro[2] = 100 * (st[2][1] * Expl_conc[2]) / (st[2][1] * Expl_conc[2] + st[2][2] + st[2][3])
+
+Expl_lim_L_pro[0] = 100 * (st[0][1] * Expl_lim_L[0]) / (st[0][1] * Expl_lim_L[0] + st[0][2] + st[0][3])
+Expl_lim_L_pro[1] = 100 * (st[1][1] * Expl_lim_L[1]) / (st[1][1] * Expl_lim_L[1] + st[1][2] + st[1][3])
+Expl_lim_L_pro[2] = 100 * (st[2][1] * Expl_lim_L[2]) / (st[2][1] * Expl_lim_L[2] + st[2][2] + st[2][3])
+
+Expl_lim_H_pro[0] = 100 * (st[0][1] * Expl_lim_H[0]) / (st[0][1] * Expl_lim_H[0] + st[0][2] + st[0][3])
+Expl_lim_H_pro[1] = 100 * (st[1][1] * Expl_lim_H[1]) / (st[1][1] * Expl_lim_H[1] + st[1][2] + st[1][3])
+Expl_lim_H_pro[2] = 100 * (st[2][1] * Expl_lim_H[2]) / (st[2][1] * Expl_lim_H[2] + st[2][2] + st[2][3])
+
+print(Expl_press)
+print(Expl_rate)
+print(Expl_conc)
+print(Expl_conc_pro)
+print(Expl_lim_L)
+print(Expl_lim_L_pro)
+print(Expl_lim_H)
+print(Expl_lim_H_pro)
+
+print("Done")
