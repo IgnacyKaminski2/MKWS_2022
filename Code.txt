@@ -12,7 +12,7 @@ P1 = P * T1 / T
 mechanika = 'gri30.cti'
 
 
-#this function calculates explosion parameters
+#this function calculates combustion parameters
 def Parameters (m, phi):
     #Pw[0] - time
     #Pw[1] - explosion pressure
